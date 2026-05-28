@@ -15,6 +15,9 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@tiptap/pm": "^3.23.6",
+    "@tiptap/starter-kit": "^3.23.6",
+    "@tiptap/vue-3": "^3.23.6",
     "fabric": "^7.4.0",
     "fast-xml-parser": "^5.8.0",
     "jspdf": "^4.2.1",

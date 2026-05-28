@@ -44,6 +44,24 @@
       </div>
     </div>
 
+<!--Подкидываем текстовый редактор \=_=/-->
+
+<div class="text-edit">
+<!--типы текста-->
+<div class="toolbar" v-if="editor">
+  <button @click="editor.chain().focus().toggleBold().run()"
+  :class="{'is-active': editor.isActive('bold')}"> :Жирный</button>
+  <button @click="editor.chain().focus().toggleItalic().run()"
+  :class="{'is-active': editor.isActive('italic')}">Курсив</button>
+  <button @click="editor.chain().focus().setParagraph().run()"
+  :class="{'is-active': editor.isActive('paragraph')}">Обычный</button>
+  <button @click="editor.chain().focus().toggleHeading({level: 1}).run()"
+  :class="{'is-active': editor.isActive('heading', {level: 1})}">Заголовок</button>
+</div>
+<!--Меню-->
+<editor-content :editor="editor" class="editor-box" />
+</div>
+
     <div class="templates">
       <label>Шаблоны:</label>
       <select @change="loadTemplate" v-model="selectedTemplate">
@@ -54,10 +72,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'           
+import { ref, onMounted, watch } from 'vue'           
 import * as fabric from 'fabric'
 import jsPDF from 'jspdf'  
+import{useEditor, EditorContent} from '@tiptap/vue-3'
+import StarterKit from '@tiptap/starter-kit'
 
+const editor = useEditor({
+  content: '<p> Привет, <strong>мир!</strong></p>',
+  extensions: [
+    StarterKit,
+  ],
+})
 
 //////        Типы экспорта
 /////          :()
@@ -268,6 +294,18 @@ const loadTemplate = () => {
   if (!selectedTemplate.value || !canvas.value) return
   console.log('Загружаем шаблон:', selectedTemplate.value)
 }
+const selectedFabricText = ref<fabric.Textbox | null>(null)
+  const updateTipTapFromFabric = (textObj: fabric.Textbox) => {
+    if (!editor.value) return
+    const content = `<p>${textObj.text?.replace(/\n/g, '<br>')}</p>`
+    editor.value.commands.setContent(content)
+  }
+  const updateFabricFromTipTap = () => {
+    if (!selectedFabricText.value || !editor.value) return
+    const plainText = editor.value.getHTML().replace(/<[^>]*>/g, '')
+    selectedFabricText.value.set('text', plainText)
+    selectedFabricText.value.canvas?.renderAll()
+  }
 
 onMounted(() => {
   const fabricCanvas = new fabric.Canvas('fabric-canvas', {
@@ -277,7 +315,29 @@ onMounted(() => {
   })
   canvas.value = fabricCanvas
   changePageSize()
+
+  const onSelectionChange = () => {
+    const active = canvas.value?.getActiveObject()
+    if (active && active.type === 'textbox') {
+      selectedFabricText.value = active as any
+     //<!-- updateTipTapFromFabric(selectedFabricText.value) -->
+ }
+else {
+      selectedFabricText.value = null
+      if (editor.value) editor.value.commands.setContent('<p> Выделить текст на холсте</p>')
+}
+  }
+  canvas.value.on('selection:created',onSelectionChange)
+  canvas.value.on('selection:created', onSelectionChange)
+  canvas.value.on('selection:created', onSelectionChange)
+});
+
+     watch(editor,(newEditor) => {
+    if (newEditor){
+      newEditor.on('update', updateFabricFromTipTap)
+  }
 })
+
 </script>
 
 <style scoped>
@@ -293,9 +353,37 @@ onMounted(() => {
 }
 .group1, .export, .group3 {
   display: flex;
-  gap: 12px;
+  gap: 16px;
 }
 .size-style, .templates {
   margin-top: 10px;
+}
+.text-editor {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px;
+}
+.toolbar{
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+.toolbar button{
+  padding: 6px 12px;
+  background: #f5f5f5;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.toolbar button.is-active{
+  background: #007bff;
+  color: white;
+  border-color: #0062cc;
+}
+.editor-box{
+  min-height: 150px;
+  outline: none;
 }
 </style>
