@@ -8,6 +8,23 @@
         <button @click="triggerFileInput">Загрузить изображение</button>
         <button @click="deleteSelectedObject" class="delete-bin">Очистить</button>
       </div>
+      <!--добавка для перемещения текста-->
+      <div v-if="showTextWindow" class="draggable-dialog"
+      ref="dialogRef" :style="dialogStyle">
+      <div class="dialog-head" @mousedown="startDrag">
+        <span>Введите текст</span>
+        <button class="close-btn" @click="showTextWindow = false"></button>
+      </div>
+      <div class="dialog-body">
+        <input type="text" v-model="newTextValue"
+        placeholder="Введите текст" autofocus />
+      </div>
+      <div class="dialog-footsteps">
+      <button @click="confirmAddText">Добавить</button>
+      <button @click="showTextWindow = false">Отменить</button>
+  </div>
+  </div>
+
 
       <div class="export">
       <label>Формат Экспорт</label>
@@ -72,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'           
+import { ref, onMounted, watch, computed, type CSSProperties } from 'vue'           
 import * as fabric from 'fabric'
 import jsPDF from 'jspdf'  
 import{useEditor, EditorContent} from '@tiptap/vue-3'
@@ -107,12 +124,64 @@ const selectedTemplate = ref('')
 
 
 function addTextBlock() {
-  if (!canvas.value) return
-  const text = new fabric.Textbox('Подпись', {
-    left: 50, top: 50, fontSize: 24, fontFamily: 'Arial', fill: '#000000'
-  })
-  canvas.value.add(text)
-  canvas.value.renderAll()
+newTextValue.value='Новый текст'
+showTextWindow.value= true
+}
+function confirmAddText(){
+if(!canvas.value) return
+const finalText = newTextValue.value.trim() || 'Новый текст'
+const text = new fabric.Textbox(finalText, {
+  left: 50,
+  top:50,
+  fontSize:24,
+  fontFamily: 'Arial',
+  fill: '#000000'
+})
+canvas.value.add(text)
+canvas.value.renderAll()
+showTextWindow.value = false
+}
+
+const showTextWindow = ref(false)
+const newTextValue = ref('Новый текст')
+const dialogRef = ref<HTMLElement | null>(null)
+const dialogPosition =ref({
+  x: window.innerWidth /2-150,
+  y: window.innerHeight / 2-100})
+const dragState = ref({isDragging: false, startX:0, startY:0, startLeft:0, startTop:0})
+
+const dialogStyle = computed(()=>({
+  left: `${dialogPosition.value.x}px`,
+  top:`${dialogPosition.value.y}px`,
+  position:'fixed' as const,
+  zIndex: 1000
+}))
+const startDrag=(e: MouseEvent) =>{
+  if (!dialogRef.value) return
+  dragState.value = {
+    isDragging: true,
+    startX: e.clientX,
+    startY: e.clientY,
+    startLeft: dialogPosition.value.x,
+    startTop: dialogPosition.value.y
+  }
+
+document.addEventListener('mousemove', onDrag)
+document.addEventListener('mouseup', stopDrag)
+}
+const onDrag = (e: MouseEvent) => {
+  if (dragState.value.isDragging) return
+  const dx = e.clientX - dragState.value.startX
+  const dy = e.clientY - dragState.value.startY
+  dialogPosition.value = {
+    x: dragState.value.startLeft + dx,
+    y: dragState.value.startTop + dy
+  }
+}
+const stopDrag = () => {
+  dragState.value.isDragging = false
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
 }
 
 const triggerFileInput = () => {
@@ -155,7 +224,7 @@ const exportToXML = () => {
   const xmlString = `<?xml version="1.0" encoding="UTF-8"?>
 <fabricCanvas>
   <data><![CDATA[${JSON.stringify(json)}]]></data>
-</fabricCanvas>`        // исправлено: обратные кавычки вместо одинарных
+</fabricCanvas>`       
   downloadFile(xmlString, 'canvas.xml', 'application/xml')
 }
 
@@ -385,5 +454,62 @@ else {
 .editor-box{
   min-height: 150px;
   outline: none;
+}
+.draggable-dialog{
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  width: 320px;
+  overflow: hidden;
+  user-select: none;
+}
+.dialog-head{
+  background: #2c3e50;
+  color: white;
+  padding: 12px 16px;
+  cursor: move;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.dialog-head span{
+  font-weight:bold;
+}
+.close-btn{
+  background:none;
+  border:none;
+  color:white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0 6px;
+}
+.dialog-body {
+  padding: 20px;
+}
+.dialog-body input{
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.dialog-footsteps{
+  padding: 12px 16px;
+  text-align: right
+}
+.dialog-footsteps button{
+  margin-left: 10px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.dialog-footsteps button:first-child{
+  background: #3498db;
+  color: white;
+}
+.dialog-footsteps button:last-child{
+  background: #e74c3c;
+  color: white;
 }
 </style> 
