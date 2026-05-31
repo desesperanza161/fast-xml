@@ -3,6 +3,16 @@
     <canvas id="fabric-canvas"></canvas>
 
     <div class="toolbar">
+      <CanvasButtons
+        @add-text="addTextBlock"
+        @load-image="triggerFileInput"
+        @delete-object="deleteSelectedObject"
+      />
+      <ExportControls
+        @export="handleExport"
+        @import="triggerXmlInput"
+      />
+      <div class="project">
       <div class="group1">
         <button @click="addTextBlock">Добавить текст</button>
         <button @click="triggerFileInput">Загрузить изображение</button>
@@ -44,69 +54,60 @@
       </div>
     </div>
 
-<!--Подкидываем текстовый редактор \=_=/-->
+    <TextDialog
+      :show="showTextWindow"
+      v-model:text="newTextValue"
+      @confirm="confirmAddText"
+      @close="showTextWindow = false"
+    />
 
-<div class="text-edit">
-<!--типы текста-->
-<div class="toolbar" v-if="editor">
-  <button @click="editor.chain().focus().toggleBold().run()"
-  :class="{'is-active': editor.isActive('bold')}"> :Жирный</button>
-  <button @click="editor.chain().focus().toggleItalic().run()"
-  :class="{'is-active': editor.isActive('italic')}">Курсив</button>
-  <button @click="editor.chain().focus().setParagraph().run()"
-  :class="{'is-active': editor.isActive('paragraph')}">Обычный</button>
-  <button @click="editor.chain().focus().toggleHeading({level: 1}).run()"
-  :class="{'is-active': editor.isActive('heading', {level: 1})}">Заголовок</button>
-</div>
-<!--Меню-->
-<editor-content :editor="editor" class="editor-box" />
-</div>
-
-    <div class="templates">
-      <label>Шаблоны:</label>
-      <select @change="loadTemplate" v-model="selectedTemplate">
-        <option value="">Выберите шаблон</option>
-      </select>
-    </div>
+    <TemplateSelector @load="loadTemplate" v-model="selectedTemplate" />
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { ref, onMounted, watch } from 'vue'           
 import * as fabric from 'fabric'
-import jsPDF from 'jspdf'  
-import{useEditor, EditorContent} from '@tiptap/vue-3'
-import StarterKit from '@tiptap/starter-kit'
+import jsPDF from 'jspdf'
+import { useEditor, EditorContent } from '@tiptap/vue-3'
 
-const editor = useEditor({
-  content: '<p> Привет, <strong>мир!</strong></p>',
-  extensions: [
-    StarterKit,
-  ],
-})
 
-//////        Типы экспорта
-/////          :()
-const exportFormat = ref('')  
-const handleExport = () => {
-  switch (exportFormat.value) {
-    case 'png': exportToPNG(); break
-    case 'jpeg': exportToJPEG(); break
-    case 'svg': exportToSVG(); break
-    case 'pdf': exportToPDF(); break
-    case 'xml': exportToXML(); break
-    default: return
-  }  exportFormat.value = ''  
-}
+import CanvasButtons from './module/CanvasButtons.vue'
+import ExportControl from './module/ExportControl.vue'
+import TextDialog from './module/TextDialog.vue'
+import TemplateSelector from './module/selector.vue'
+
+
 
 const canvas = ref<fabric.Canvas | null>(null)
 const selectedSize = ref('800x600')
 const customWidth = ref(800)
 const customHeight = ref(600)
 const selectedTemplate = ref('')
-
+const showTextWindow = ref(false)
+const newTextValue = ref('Новый текст')
 
 function addTextBlock() {
+  newTextValue.value = 'Новый текст'
+  showTextWindow.value = true
+}
+
+function confirmAddText() {
+  if (!canvas.value) return
+  const finalText = newTextValue.value.trim() || 'Новый текст'
+  const text = new fabric.Textbox(finalText, {
+    left: 50, top: 50, fontSize: 24, fontFamily: 'Arial', fill: '#000000',
+    hasControls: true, hasBorders: true, cornerSize: 8,
+    transparentCorners: false, cornerColor: '#3498db', borderColor: '#3498db'
+  })
+  canvas.value.add(text)
+  canvas.value.renderAll()
+  canvas.value.setActiveObject(text)
+  showTextWindow.value = false
+}
+
+function triggerFileInput() {
   if (!canvas.value) return
   const text = new fabric.Textbox('Подпись', {
     left: 50, top: 50, fontSize: 24, fontFamily: 'Arial', fill: '#000000'
@@ -127,9 +128,7 @@ const triggerFileInput = () => {
       const imgElement = new Image()
       imgElement.src = f.target?.result as string
       imgElement.onload = () => {
-        const img = new fabric.Image(imgElement, {
-          left: 100, top: 100, scaleX: 0.5, scaleY: 0.5
-        })
+        const img = new fabric.Image(imgElement, { left: 100, top: 100, scaleX: 0.5, scaleY: 0.5 })
         canvas.value?.add(img)
         canvas.value?.renderAll()
       }
@@ -139,7 +138,7 @@ const triggerFileInput = () => {
   input.click()
 }
 
-const deleteSelectedObject = () => {
+function deleteSelectedObject() {
   if (!canvas.value) return
   const obj = canvas.value.getActiveObject()
   if (obj) {
@@ -149,6 +148,15 @@ const deleteSelectedObject = () => {
   }
 }
 
+function handleExport(format: string) {
+
+}
+
+function triggerXmlInput() {
+
+}
+
+function changePageSize() {
 const exportToXML = () => {
   if (!canvas.value) return
   const json = canvas.value.toJSON()
@@ -196,33 +204,24 @@ const exportToPNG = () => {
 
 const exportToSVG=() => {
   if (!canvas.value) return
-  const svgString = canvas.value.toSVG()
-  downloadFile(svgString,'canvas.svg', 'image/svg+xml')
-}
-
-const exportToJPEG=() => {
-  if (!canvas.value) return
-  const dataURL = canvas.value.toDataURL({format: 'jpeg',  multiplier: 1})
-  downloadFile(dataURL,'canvas.jpeg', 'image/jpeg')
-}
-
-const exportToPDF = () => {
-  if (!canvas.value) return
-  const dataURL = canvas.value.toDataURL({ format: 'png', multiplier: 1 })
-  const img = new Image()
-  img.src = dataURL
-  img.onload = () => {
-    const pdf = new jsPDF({
-      orientation: img.width > img.height ? 'landscape' : 'portrait',
-      unit: 'px',
-      format: [img.width, img.height]
-    })
-    pdf.addImage(dataURL, 'PNG', 0, 0, img.width, img.height)
-    pdf.save('canvas.pdf')
+  let width = 800, height = 600
+  switch (selectedSize.value) {
+    case 'a4-portret': width = 595; height = 842; break
+    case 'a4-albom': width = 842; height = 595; break
+    case 'a5': width = 420; height = 595; break
+    case 'Letter': width = 612; height = 792; break
+    case 'custom': width = customWidth.value; height = customHeight.value; break
+    default: width = 800; height = 600
   }
+  canvas.value.setDimensions({ width, height })
+  canvas.value.renderAll()
 }
 
-const newProject = () => {
+function applyCustomSize() {
+  if (selectedSize.value === 'custom') changePageSize()
+}
+
+function newProject() {
   if (!canvas.value) return
   canvas.value.clear()
   canvas.value.backgroundColor = 'white'
@@ -231,113 +230,17 @@ const newProject = () => {
   canvas.value.renderAll()
 }
 
-const downloadFile = (content: string | Blob, filename: string, mimeType?: string) => {  // убран тип DataURL
-  let blob: Blob
-  if (typeof content === 'string') {
-    blob = new Blob([content], { type: mimeType || 'text/plain' })
-  } else {
-    blob = content as Blob
-  }
-  const link = document.createElement('a')
-  const url = URL.createObjectURL(blob)
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+function loadTemplate(templateId: string) {
+  console.log('Загружаем шаблон:', templateId)
 }
-//страницы всех мастей
-//
-//BY
-const changePageSize = () => {
-  if (!canvas.value) return
-  let width = 800
-  let height = 600
-  switch (selectedSize.value) {
-    case 'a4-portret':
-      width = 595
-      height = 842
-      break
-    case 'a4-albom':
-      width = 842
-      height = 595       
-      break
-    case 'a5':
-      width = 420
-      height = 595
-      break
-    case 'Letter':
-      width = 612
-      height = 792
-      break
-    case 'custom':
-      width = customWidth.value
-      height = customHeight.value
-      break
-    default:
-      width = 800
-      height = 600
-  }
-canvas.value.setDimensions({ width, height })
-  canvas.value.renderAll()
-}
-
-const applyCustomSize = () => {
-  if (selectedSize.value === 'custom') {
-    changePageSize()
-  }
-}
-
-
-const loadTemplate = () => {
-  if (!selectedTemplate.value || !canvas.value) return
-  console.log('Загружаем шаблон:', selectedTemplate.value)
-}
-const selectedFabricText = ref<fabric.Textbox | null>(null)
-  const updateTipTapFromFabric = (textObj: fabric.Textbox) => {
-    if (!editor.value) return
-    const content = `<p>${textObj.text?.replace(/\n/g, '<br>')}</p>`
-    editor.value.commands.setContent(content)
-  }
-  const updateFabricFromTipTap = () => {
-    if (!selectedFabricText.value || !editor.value) return
-    const plainText = editor.value.getHTML().replace(/<[^>]*>/g, '')
-    selectedFabricText.value.set('text', plainText)
-    selectedFabricText.value.canvas?.renderAll()
-  }
 
 onMounted(() => {
   const fabricCanvas = new fabric.Canvas('fabric-canvas', {
-    width: 800,
-    height: 600,
-    backgroundColor: 'white'
+    width: 800, height: 600, backgroundColor: 'white'
   })
   canvas.value = fabricCanvas
   changePageSize()
-
-  const onSelectionChange = () => {
-    const active = canvas.value?.getActiveObject()
-    if (active && active.type === 'textbox') {
-      selectedFabricText.value = active as any
-     //<!-- updateTipTapFromFabric(selectedFabricText.value) -->
- }
-else {
-      selectedFabricText.value = null
-      if (editor.value) editor.value.commands.setContent('<p> Выделить текст на холсте</p>')
-}
-  }
-  canvas.value.on('selection:created',onSelectionChange)
-  canvas.value.on('selection:created', onSelectionChange)
-  canvas.value.on('selection:created', onSelectionChange)
-});
-
-     watch(editor,(newEditor) => {
-    if (newEditor){
-      newEditor.on('update', updateFabricFromTipTap)
-  }
 })
-
 </script>
 
 <style scoped>
@@ -358,6 +261,7 @@ else {
 .size-style, .templates {
   margin-top: 10px;
 }
+</style>
 .text-editor {
   border: 1px solid #ddd;
   border-radius: 6px;
