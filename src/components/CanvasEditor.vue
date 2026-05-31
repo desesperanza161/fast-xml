@@ -13,26 +13,6 @@
         @import="triggerXmlInput"
       />
       <div class="project">
-      <div class="group1">
-        <button @click="addTextBlock">Добавить текст</button>
-        <button @click="triggerFileInput">Загрузить изображение</button>
-        <button @click="deleteSelectedObject" class="delete-bin">Очистить</button>
-      </div>
-
-      <div class="export">
-      <label>Формат Экспорт</label>
-      <select v-model="exportFormat" @change="handleExport">
-        <option value="svg">"Экспорт SVG"</option>
-        <option value="jpeg"> Экспорт JPEG</option>
-        <option value="xml">Экспорт XML</option>
-        <option value="png">Экспорт PNG</option>
-        <option value="pdf">Экспорт PDF</option>
-      </select>
-      <button @click="triggerXmlInput">Загрузить XML</button>
-      </div>
-
-
-      <div class="group3">
         <button @click="newProject">Новый проект</button>
       </div>
     </div>
@@ -67,11 +47,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ref, onMounted, watch } from 'vue'           
 import * as fabric from 'fabric'
 import jsPDF from 'jspdf'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
-
 
 import CanvasButtons from './module/CanvasButtons.vue'
 import ExportControl from './module/ExportControl.vue'
@@ -108,15 +86,6 @@ function confirmAddText() {
 }
 
 function triggerFileInput() {
-  if (!canvas.value) return
-  const text = new fabric.Textbox('Подпись', {
-    left: 50, top: 50, fontSize: 24, fontFamily: 'Arial', fill: '#000000'
-  })
-  canvas.value.add(text)
-  canvas.value.renderAll()
-}
-
-const triggerFileInput = () => {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = 'image/*'
@@ -157,52 +126,6 @@ function triggerXmlInput() {
 }
 
 function changePageSize() {
-const exportToXML = () => {
-  if (!canvas.value) return
-  const json = canvas.value.toJSON()
-  const xmlString = `<?xml version="1.0" encoding="UTF-8"?>
-<fabricCanvas>
-  <data><![CDATA[${JSON.stringify(json)}]]></data>
-</fabricCanvas>`        // исправлено: обратные кавычки вместо одинарных
-  downloadFile(xmlString, 'canvas.xml', 'application/xml')
-}
-
-const triggerXmlInput = () => {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = '.xml'
-  input.onchange = (e: Event) => {
-    const file = (e.target as HTMLInputElement).files?.[0]
-    if (!file || !canvas.value) return
-    const reader = new FileReader()
-    reader.onload = (f) => {
-      try {
-        const xmlString = f.target?.result as string
-        const parser = new DOMParser()
-        const xmlDoc = parser.parseFromString(xmlString, 'application/xml')
-        const cdata = xmlDoc.querySelector('data')?.textContent
-        if (cdata) {
-          const json = JSON.parse(cdata)
-          canvas.value?.loadFromJSON(json, () => {
-            canvas.value?.renderAll()
-          })
-        }
-      } catch (err) {
-        console.error('Ошибка загрузки XML', err)
-      }
-    }
-    reader.readAsText(file)
-  }
-  input.click()
-}
-
-const exportToPNG = () => {
-  if (!canvas.value) return
-  const dataURL = canvas.value.toDataURL({ format: 'png', multiplier: 1 })
-  downloadFile(dataURL, 'canvas.png', 'image/png')
-}
-
-const exportToSVG=() => {
   if (!canvas.value) return
   let width = 800, height = 600
   switch (selectedSize.value) {
@@ -262,32 +185,3 @@ onMounted(() => {
   margin-top: 10px;
 }
 </style>
-.text-editor {
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 10px;
-}
-.toolbar{
-  display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eee;
-}
-.toolbar button{
-  padding: 6px 12px;
-  background: #f5f5f5;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.toolbar button.is-active{
-  background: #007bff;
-  color: white;
-  border-color: #0062cc;
-}
-.editor-box{
-  min-height: 150px;
-  outline: none;
-}
-</style> 
