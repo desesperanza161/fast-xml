@@ -8,10 +8,7 @@
         @load-image="triggerFileInput"
         @delete-object="deleteSelectedObject"
       />
-      <ExportControls
-        @export="handleExport"
-        @import="triggerXmlInput"
-      />
+     <ExportControl @export="handleExport" @import="triggerXmlInput" />
       <div class="project">
         <button @click="newProject">Новый проект</button>
       </div>
@@ -55,9 +52,7 @@ import CanvasButtons from './module/CanvasButtons.vue'
 import ExportControl from './module/ExportControl.vue'
 import TextDialog from './module/TextDialog.vue'
 import TemplateSelector from './module/selector.vue'
-
-
-
+import { exportToPNG, exportToJPEG, exportToSVG, exportToPDF, exportToXML } from './module/export'
 const canvas = ref<fabric.Canvas | null>(null)
 const selectedSize = ref('800x600')
 const customWidth = ref(800)
@@ -118,11 +113,41 @@ function deleteSelectedObject() {
 }
 
 function handleExport(format: string) {
-
+  switch (format) {
+    case 'png': exportToPNG(canvas.value); break
+    case 'jpeg': exportToJPEG(canvas.value); break
+    case 'svg': exportToSVG(canvas.value); break
+    case 'pdf': exportToPDF(canvas.value); break
+    case 'xml': exportToXML(canvas.value); break
+    default: console.warn('Неизвестный формат', format)
+  }
 }
 
 function triggerXmlInput() {
-
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xml'
+  input.onchange = (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file || !canvas.value) return
+    const reader = new FileReader()
+    reader.onload = (f) => {
+      try {
+        const xmlString = f.target?.result as string
+        const parser = new DOMParser()
+        const xmlDoc = parser.parseFromString(xmlString, 'application/xml')
+        const cdata = xmlDoc.querySelector('data')?.textContent
+        if (cdata) {
+          const json = JSON.parse(cdata)
+          canvas.value?.loadFromJSON(json, () => canvas.value?.renderAll())
+        }
+      } catch (err) {
+        console.error('Ошибка загрузки XML', err)
+      }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
 }
 
 function changePageSize() {

@@ -8,16 +8,20 @@
     <option value="xml">XML</option>
 </select>
 <button @click="$emit('export', selectedFormat)">Экспорт</button>
-<button @click="$emit('import-xml')">Загрузить XML</button>
+<button @click="$emit('import')">Загрузить XML</button>
 </template>
 
 <script setup lang="ts">
 import {ref} from 'vue'
 const selectedFormat=ref('png')
-defineEmits<{
-    (e: 'export', format: string): void
-    (e: 'import-xml'): void
-}>()
+const handleExportChange =() =>{
+    if (selectedFormat.value){
+        $emit('export', selectedFormat.value)
+    }
+}
+
+
+const $emit= defineEmits(['export', 'import'])
 </script>
 
 
