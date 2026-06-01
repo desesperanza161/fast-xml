@@ -1,6 +1,19 @@
 <template>
-  <div class="canvas-editor">
-    <canvas id="fabric-canvas"></canvas>
+  <canvas id="fabric-canvas"></canvas>
+  <div
+    class="canvas-editor"
+    :class="{ dark: editorTheme === 'dark' }"
+  >
+
+
+  <label>Тема редактора:</label>
+<select v-model="editorTheme">
+  <option value="light">Светлая</option>
+  <option value="dark">Тёмная</option>
+</select>
+
+
+
 
     <div class="toolbar">
       <CanvasButtons
@@ -12,7 +25,43 @@
       <div class="project">
         <button @click="newProject">Новый проект</button>
       </div>
+<div v-if="selectedObject" class="properties-panel">
+  <h3>Свойства</h3>
+  <div v-if="selectedObject.type === 'textbox'">
+    <label>Текст:</label>
+    <textarea v-model="editableText" @input="updateText"></textarea>
+    <label>Шрифт:</label>
+    <select v-model="selectedFont" @change="updateFont">
+      <option>Arial</option><option>Times New Roman</option>
+      <option>Courier New</option><option>Verdana</option>
+    </select>
+    <label>Размер (px):</label>
+    <input type="number" v-model="selectedFontSize" @change="updateFontSize" />
+    <label>Цвет:</label>
+    <input type="color" v-model="selectedColor" @change="updateColor" />
+    <label>Выравнивание:</label>
+    <select v-model="selectedTextAlign" @change="updateTextAlign">
+      <option value="left">По левому краю</option>
+      <option value="center">По центру</option>
+      <option value="right">По правому краю</option>
+    </select>
+  </div>
+  <div v-if="selectedObject.type === 'image'">
+    <label>Прозрачность:</label>
+    <input type="range" min="0" max="1" step="0.01" v-model="selectedOpacity" @input="updateOpacity" />
+  </div>
+</div>
     </div>
+
+    <div class="background-settings">
+  <label>Цвет фона:</label>
+
+  <input
+    type="color"
+    v-model="backgroundColor"
+    @input="updateBackgroundColor"
+  />
+</div>
 
     <div class="size-style">
       <label>Размер страницы:</label>
@@ -37,21 +86,15 @@
       @confirm="confirmAddText"
       @close="showTextWindow = false"
     />
-
-    <TemplateSelector @load="loadTemplate" v-model="selectedTemplate" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import * as fabric from 'fabric'
-import jsPDF from 'jspdf'
-import { useEditor, EditorContent } from '@tiptap/vue-3'
-
 import CanvasButtons from './module/CanvasButtons.vue'
 import ExportControl from './module/ExportControl.vue'
 import TextDialog from './module/TextDialog.vue'
-import TemplateSelector from './module/selector.vue'
 import { exportToPNG, exportToJPEG, exportToSVG, exportToPDF, exportToXML } from './module/export'
 const canvas = ref<fabric.Canvas | null>(null)
 const selectedSize = ref('800x600')
@@ -60,10 +103,94 @@ const customHeight = ref(600)
 const selectedTemplate = ref('')
 const showTextWindow = ref(false)
 const newTextValue = ref('Новый текст')
+const backgroundColor = ref('#ffffff')
+const selectedObject = ref<any>(null)
+const editableText = ref('')
+const selectedFont = ref('Arial')
+const selectedFontSize = ref(24)
+const selectedColor = ref('#000000')
+const selectedTextAlign = ref('left')
+const selectedOpacity = ref(1)
+const editorTheme = ref('light')
 
+function loadObjectProperties() {
+  if (!selectedObject.value) return
+  if (selectedObject.value.type === 'textbox') {
+    editableText.value = selectedObject.value.text || ''
+    selectedFont.value = selectedObject.value.fontFamily || 'Arial'
+    selectedFontSize.value = selectedObject.value.fontSize || 24
+    selectedColor.value = selectedObject.value.fill || '#000000'
+    selectedTextAlign.value = selectedObject.value.textAlign || 'left'
+  } else if (selectedObject.value.type === 'image') {
+    selectedOpacity.value = selectedObject.value.opacity || 1
+  } 
+}
+function updateBackgroundColor() {
+  if (!canvas.value) return
+
+  canvas.value.set('backgroundColor', backgroundColor.value)
+  canvas.value.renderAll()
+}
+
+function updateText() {
+  if (selectedObject.value?.type === 'textbox') {
+    selectedObject.value.set('text', editableText.value)
+    canvas.value?.renderAll()
+  }
+}
+function updateFont() {
+  if (selectedObject.value?.type === 'textbox') {
+    selectedObject.value.set('fontFamily', selectedFont.value)
+    canvas.value?.renderAll()
+  }
+}
+function updateFontSize() {
+  if (selectedObject.value?.type === 'textbox') {
+    selectedObject.value.set('fontSize', selectedFontSize.value);
+    canvas.value?.renderAll();
+  }
+}
+function updateColor() {
+  if (selectedObject.value?.type === 'textbox') {
+    selectedObject.value.set('fill', selectedColor.value)
+    canvas.value?.renderAll()
+  }
+}
+function updateTextAlign() {
+  if (selectedObject.value?.type === 'textbox') {
+    selectedObject.value.set('textAlign', selectedTextAlign.value)
+    canvas.value?.renderAll()
+  }
+}
+function updateOpacity() {
+  if (selectedObject.value?.type === 'image') {
+    selectedObject.value.set('opacity', selectedOpacity.value)
+    canvas.value?.renderAll()
+  }
+}
+
+function handleKeyDown(event: KeyboardEvent) {
+  if (event.key === 'Delete') {
+    deleteSelectedObject()
+    event.preventDefault()
+  }
+}
 function addTextBlock() {
-  newTextValue.value = 'Новый текст'
-  showTextWindow.value = true
+  if (!canvas.value) return
+
+  const textbox = new fabric.Textbox('Введите текст', {
+    left: 100,
+    top: 100,
+    width: 300,
+    fontSize: 24,
+    editable: true
+  })
+
+  canvas.value.add(textbox)
+  canvas.value.setActiveObject(textbox)
+
+  textbox.enterEditing()
+  textbox.selectAll()
 }
 
 function confirmAddText() {
@@ -72,7 +199,13 @@ function confirmAddText() {
   const text = new fabric.Textbox(finalText, {
     left: 50, top: 50, fontSize: 24, fontFamily: 'Arial', fill: '#000000',
     hasControls: true, hasBorders: true, cornerSize: 8,
-    transparentCorners: false, cornerColor: '#3498db', borderColor: '#3498db'
+    transparentCorners: false, cornerColor: '#3498db', borderColor: '#3498db',
+    lockScalingX: false,
+    lockScalingY: false
+  })
+  ;(text as any).setControlsVisibility({
+    tl: true, tr: true, bl: true, br: true,
+    ml: true, mr: true, mt: true, mb: true
   })
   canvas.value.add(text)
   canvas.value.renderAll()
@@ -182,13 +315,28 @@ function loadTemplate(templateId: string) {
   console.log('Загружаем шаблон:', templateId)
 }
 
+
 onMounted(() => {
   const fabricCanvas = new fabric.Canvas('fabric-canvas', {
     width: 800, height: 600, backgroundColor: 'white'
-  })
-  canvas.value = fabricCanvas
-  changePageSize()
-})
+  });
+  canvas.value = fabricCanvas;
+  changePageSize();
+
+  fabricCanvas.on('selection:created', (e) => {
+    selectedObject.value = e.selected[0];
+    loadObjectProperties();
+  });
+  fabricCanvas.on('selection:updated', (e) => {
+    selectedObject.value = e.selected[0];
+    loadObjectProperties();
+  });
+  fabricCanvas.on('selection:cleared', () => {
+    selectedObject.value = null;
+  });
+
+  window.addEventListener('keydown', handleKeyDown);
+});
 </script>
 
 <style scoped>
@@ -196,6 +344,21 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+.canvas-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 100vh;
+  padding: 10px;
+
+  background: #f5f5f5;
+  transition: background 0.3s ease;
+}
+
+.canvas-editor.dark {
+  background: #1e1e1e;
+  color: white;
 }
 .toolbar {
   display: flex;
