@@ -1,30 +1,37 @@
 <template>
-  <canvas id="fabric-canvas"></canvas>
   <div
     class="canvas-editor"
     :class="{ dark: editorTheme === 'dark' }"
   >
+    <div class="header">
+      <h1>Быстрые отчеты</h1>
+      <p>Наш отчет — ваше время</p>
+    </div>
 
 
-  <label>Тема редактора:</label>
-<select v-model="editorTheme">
-  <option value="light">Светлая</option>
-  <option value="dark">Тёмная</option>
-</select>
-
-
-
-
-    <div class="toolbar">
-      <CanvasButtons
-        @add-text="addTextBlock"
-        @load-image="triggerFileInput"
-        @delete-object="deleteSelectedObject"
-      />
-     <ExportControl @export="handleExport" @import="triggerXmlInput" />
-      <div class="project">
-        <button @click="newProject">Новый проект</button>
+<div class="editor-layout">
+      <div class="canvas-container">
+        <canvas id="fabric-canvas"></canvas>
       </div>
+  <div class="side-panel">
+
+  <CanvasButtons
+    @add-text="addTextBlock"
+    @load-image="triggerFileInput"
+    @delete-object="deleteSelectedObject"
+  />
+  <div class="theme-switch">
+    <label>Тема</label>
+
+    <select v-model="editorTheme">
+      <option value="light">Светлая</option>
+      <option value="dark">Тёмная</option>
+    </select>
+  </div>
+
+
+
+
 <div v-if="selectedObject" class="properties-panel">
   <h3>Свойства</h3>
   <div v-if="selectedObject.type === 'textbox'">
@@ -38,6 +45,21 @@
     <label>Размер (px):</label>
     <input type="number" v-model="selectedFontSize" @change="updateFontSize" />
     <label>Цвет:</label>
+    <div class="text-style-buttons">
+      <button @click="toggleBold">Жирный</button>
+      <button @click="toggleItalic">Курсив</button>
+      <button @click="toggleUnderline">Подчеркнуть</button>
+      <input type="color" v-model="selectedColor" @change="updateColor" />
+
+<label>Выравнивание:</label>
+
+<select v-model="selectedTextAlign" @change="updateTextAlign">
+  <option value="left">По левому краю</option>
+  <option value="center">По центру</option>
+  <option value="right">По правому краю</option>
+</select>
+
+
     <input type="color" v-model="selectedColor" @change="updateColor" />
     <label>Выравнивание:</label>
     <select v-model="selectedTextAlign" @change="updateTextAlign">
@@ -53,15 +75,6 @@
 </div>
     </div>
 
-    <div class="background-settings">
-  <label>Цвет фона:</label>
-
-  <input
-    type="color"
-    v-model="backgroundColor"
-    @input="updateBackgroundColor"
-  />
-</div>
 
     <div class="size-style">
       <label>Размер страницы:</label>
@@ -77,9 +90,52 @@
         <input type="number" v-model="customWidth" placeholder="Ширина" />
         <input type="number" v-model="customHeight" placeholder="Высота" />
         <button @click="applyCustomSize">Применить</button>
+        </div>
       </div>
-    </div>
+    
+  <ExportControl
+    @export="handleExport"
+    @import="triggerXmlInput"
+  />
 
+  <button @click="newProject">
+    Новый проект
+  </button>
+
+  <div class="background-settings">
+    <label>Цвет фона:</label>
+
+    <input
+      type="color"
+      v-model="backgroundColor"
+      @input="updateBackgroundColor"
+    />
+  </div>
+  </div>
+
+  <div class="size-style">
+    <label>Размер страницы:</label>
+
+    <select
+      v-model="selectedSize"
+      @change="changePageSize"
+    >
+      <option value="800x600">По умолчанию</option>
+      <option value="a4-portret">A4 (Портрет)</option>
+      <option value="a4-albom">A4 (Альбом)</option>
+      <option value="a5">A5</option>
+      <option value="Letter">Письмо</option>
+      <option value="custom">Свои размеры</option>
+    </select>
+
+    <div v-if="selectedSize === 'custom'">
+      <input type="number" v-model="customWidth" placeholder="Ширина" />
+      <input type="number" v-model="customHeight" placeholder="Высота" />
+      <button @click="applyCustomSize">Применить</button>
+    </div>
+  </div>
+
+</div>
     <TextDialog
       :show="showTextWindow"
       v-model:text="newTextValue"
@@ -95,7 +151,13 @@ import * as fabric from 'fabric'
 import CanvasButtons from './module/CanvasButtons.vue'
 import ExportControl from './module/ExportControl.vue'
 import TextDialog from './module/TextDialog.vue'
-import { exportToPNG, exportToJPEG, exportToSVG, exportToPDF, exportToXML } from './module/export'
+import {
+  exportToPNG,
+  exportToJPEG,
+  exportToSVG,
+  exportToPDF,
+  exportToXML
+} from './module/export'
 const canvas = ref<fabric.Canvas | null>(null)
 const selectedSize = ref('800x600')
 const customWidth = ref(800)
@@ -112,6 +174,36 @@ const selectedColor = ref('#000000')
 const selectedTextAlign = ref('left')
 const selectedOpacity = ref(1)
 const editorTheme = ref('light')
+const isBold = ref(false)
+const isItalic = ref(false)
+const isUnderline = ref(false)
+
+function handleExport(format: string) {
+
+  switch (format) {
+    case 'png':
+      exportToPNG(canvas.value)
+      break
+
+    case 'jpeg':
+      exportToJPEG(canvas.value)
+      break
+
+    case 'svg':
+      exportToSVG(canvas.value)
+      break
+
+    case 'pdf':
+      exportToPDF(canvas.value)
+      break
+
+    case 'xml':
+      exportToXML(canvas.value, {
+        editorTheme: editorTheme.value
+      })
+      break
+  }
+}
 
 function loadObjectProperties() {
   if (!selectedObject.value) return
@@ -121,6 +213,9 @@ function loadObjectProperties() {
     selectedFontSize.value = selectedObject.value.fontSize || 24
     selectedColor.value = selectedObject.value.fill || '#000000'
     selectedTextAlign.value = selectedObject.value.textAlign || 'left'
+    isBold.value = selectedObject.value.fontWeight || 'bold'
+    isItalic.value = selectedObject.value.fontStyle || 'italic'
+    isUnderline.value = selectedObject.value.underline || true
   } else if (selectedObject.value.type === 'image') {
     selectedOpacity.value = selectedObject.value.opacity || 1
   } 
@@ -161,6 +256,41 @@ function updateTextAlign() {
     selectedObject.value.set('textAlign', selectedTextAlign.value)
     canvas.value?.renderAll()
   }
+}
+function toggleBold() {
+  if (selectedObject.value?.type !== 'textbox') return
+
+  isBold.value = !isBold.value
+
+  selectedObject.value.set({
+    fontWeight: isBold.value ? 'bold' : 'normal'
+  })
+
+  canvas.value?.renderAll()
+}
+
+function toggleItalic() {
+  if (selectedObject.value?.type !== 'textbox') return
+
+  isItalic.value = !isItalic.value
+
+  selectedObject.value.set({
+    fontStyle: isItalic.value ? 'italic' : 'normal'
+  })
+
+  canvas.value?.renderAll()
+}
+
+function toggleUnderline() {
+  if (selectedObject.value?.type !== 'textbox') return
+
+  isUnderline.value = !isUnderline.value
+
+  selectedObject.value.set({
+    underline: isUnderline.value
+  })
+
+  canvas.value?.renderAll()
 }
 function updateOpacity() {
   if (selectedObject.value?.type === 'image') {
@@ -245,41 +375,84 @@ function deleteSelectedObject() {
   }
 }
 
-function handleExport(format: string) {
-  switch (format) {
-    case 'png': exportToPNG(canvas.value); break
-    case 'jpeg': exportToJPEG(canvas.value); break
-    case 'svg': exportToSVG(canvas.value); break
-    case 'pdf': exportToPDF(canvas.value); break
-    case 'xml': exportToXML(canvas.value); break
-    default: console.warn('Неизвестный формат', format)
-  }
-}
-
 function triggerXmlInput() {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '.xml'
+
   input.onchange = (e: Event) => {
     const file = (e.target as HTMLInputElement).files?.[0]
+
     if (!file || !canvas.value) return
+
     const reader = new FileReader()
+
     reader.onload = (f) => {
       try {
         const xmlString = f.target?.result as string
+
         const parser = new DOMParser()
-        const xmlDoc = parser.parseFromString(xmlString, 'application/xml')
-        const cdata = xmlDoc.querySelector('data')?.textContent
-        if (cdata) {
-          const json = JSON.parse(cdata)
-          canvas.value?.loadFromJSON(json, () => canvas.value?.renderAll())
-        }
+        const xmlDoc = parser.parseFromString(
+          xmlString,
+          'application/xml'
+        )
+
+        const cdata =
+          xmlDoc.querySelector('data')?.textContent
+
+        if (!cdata) return
+
+        const project = JSON.parse(cdata)
+
+        canvas.value?.loadFromJSON(
+          project.canvas,
+          () => {
+
+            if (project.page) {
+
+              canvas.value?.setDimensions({
+                width: project.page.width,
+                height: project.page.height
+              })
+
+              canvas.value?.set(
+                'backgroundColor',
+                project.page.backgroundColor
+              )
+
+              backgroundColor.value =
+                project.page.backgroundColor
+
+              selectedSize.value = 'custom'
+
+              customWidth.value =
+                project.page.width
+
+              customHeight.value =
+                project.page.height
+            }
+
+            if (project.ui) {
+
+              editorTheme.value =
+                project.ui.editorTheme || 'light'
+            }
+
+            canvas.value?.renderAll()
+          }
+        )
+
       } catch (err) {
-        console.error('Ошибка загрузки XML', err)
+        console.error(
+          'Ошибка загрузки XML',
+          err
+        )
       }
     }
+
     reader.readAsText(file)
   }
+
   input.click()
 }
 
@@ -355,7 +528,42 @@ onMounted(() => {
   background: #f5f5f5;
   transition: background 0.3s ease;
 }
+.editor-layout{
+  display:flex;
+  gap:20px;
+  align-items:flex-start;
+}
 
+.side-panel {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 15px;
+  border: 1px solid #444;
+  border-radius: 8px;
+}
+
+.side-panel button,
+.side-panel select,
+.side-panel input,
+.side-panel textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+.canvas-editor {
+  color: #000;
+}
+.canvas-editor label,
+.canvas-editor h1,
+.canvas-editor h2,
+.canvas-editor h3,
+.canvas-editor p {
+  color: inherit;
+}
+.canvas-container{
+  flex:1;
+}
 .canvas-editor.dark {
   background: #1e1e1e;
   color: white;
