@@ -8,134 +8,96 @@
       <p>Наш отчет — ваше время</p>
     </div>
 
+    <div class="editor-layout">
+      <div class="left-panel">
+        <div v-if="selectedObject" class="properties-panel">
+          <h3>Свойства</h3>
+          <div v-if="selectedObject.type === 'textbox'">
+            <label>Текст:</label>
+            <textarea v-model="editableText" @input="updateText"></textarea>
 
-<div class="editor-layout">
+            <label>Шрифт:</label>
+            <select v-model="selectedFont" @change="updateFont">
+              <option>Arial</option>
+              <option>Times New Roman</option>
+              <option>Courier New</option>
+              <option>Verdana</option>
+            </select>
+
+            <label>Размер (px):</label>
+            <input type="number" v-model="selectedFontSize" @change="updateFontSize" />
+
+            <label>Цвет:</label>
+            <div class="text-style-buttons">
+              <button @click="toggleBold">Жирный</button>
+              <button @click="toggleItalic">Курсив</button>
+              <button @click="toggleUnderline">Подчеркнуть</button>
+              <input type="color" v-model="selectedColor" @change="updateColor" />
+
+              <label>Выравнивание:</label>
+              <select v-model="selectedTextAlign" @change="updateTextAlign">
+                <option value="left">По левому краю</option>
+                <option value="center">По центру</option>
+                <option value="right">По правому краю</option>
+              </select>
+            </div>
+          </div>
+
+          <div v-if="selectedObject.type === 'image'">
+            <label>Прозрачность:</label>
+            <input type="range" min="0" max="1" step="0.01" v-model="selectedOpacity" @input="updateOpacity" />
+          </div>
+        </div>
+      </div>
+
       <div class="canvas-container">
         <canvas id="fabric-canvas"></canvas>
       </div>
-  <div class="side-panel">
 
-  <CanvasButtons
-    @add-text="addTextBlock"
-    @load-image="triggerFileInput"
-    @delete-object="deleteSelectedObject"
-  />
-  <div class="theme-switch">
-    <label>Тема</label>
+      <div class="side-panel">
+        <CanvasButtons
+          @add-text="addTextBlock"
+          @load-image="triggerFileInput"
+          @delete-object="deleteSelectedObject"
+        />
 
-    <select v-model="editorTheme">
-      <option value="light">Светлая</option>
-      <option value="dark">Тёмная</option>
-    </select>
-  </div>
+        <div class="theme-switch">
+          <label>Тема</label>
+          <select v-model="editorTheme">
+            <option value="light">Светлая</option>
+            <option value="dark">Тёмная</option>
+          </select>
+        </div>
 
+        <div class="size-style">
+          <label>Размер страницы:</label>
+          <select v-model="selectedSize" @change="changePageSize">
+            <option value="800x600">По умолчанию</option>
+            <option value="a4-portret">A4 (Портрет)</option>
+            <option value="a4-albom">A4 (Альбом)</option>
+            <option value="a5">A5</option>
+            <option value="Letter">Письмо</option>
+            <option value="custom">Свои размеры</option>
+          </select>
 
+          <div v-if="selectedSize === 'custom'">
+            <input type="number" v-model="customWidth" placeholder="Ширина" />
+            <input type="number" v-model="customHeight" placeholder="Высота" />
+            <button @click="applyCustomSize">Применить</button>
+          </div>
+        </div>
 
+        <ExportControl @export="handleExport" @import="triggerXmlInput" />
 
-<div v-if="selectedObject" class="properties-panel">
-  <h3>Свойства</h3>
-  <div v-if="selectedObject.type === 'textbox'">
-    <label>Текст:</label>
-    <textarea v-model="editableText" @input="updateText"></textarea>
-    <label>Шрифт:</label>
-    <select v-model="selectedFont" @change="updateFont">
-      <option>Arial</option><option>Times New Roman</option>
-      <option>Courier New</option><option>Verdana</option>
-    </select>
-    <label>Размер (px):</label>
-    <input type="number" v-model="selectedFontSize" @change="updateFontSize" />
-    <label>Цвет:</label>
-    <div class="text-style-buttons">
-      <button @click="toggleBold">Жирный</button>
-      <button @click="toggleItalic">Курсив</button>
-      <button @click="toggleUnderline">Подчеркнуть</button>
-      <input type="color" v-model="selectedColor" @change="updateColor" />
+        <button @click="newProject">Новый проект</button>
 
-<label>Выравнивание:</label>
-
-<select v-model="selectedTextAlign" @change="updateTextAlign">
-  <option value="left">По левому краю</option>
-  <option value="center">По центру</option>
-  <option value="right">По правому краю</option>
-</select>
-
-
-    <input type="color" v-model="selectedColor" @change="updateColor" />
-    <label>Выравнивание:</label>
-    <select v-model="selectedTextAlign" @change="updateTextAlign">
-      <option value="left">По левому краю</option>
-      <option value="center">По центру</option>
-      <option value="right">По правому краю</option>
-    </select>
-  </div>
-  <div v-if="selectedObject.type === 'image'">
-    <label>Прозрачность:</label>
-    <input type="range" min="0" max="1" step="0.01" v-model="selectedOpacity" @input="updateOpacity" />
-  </div>
-</div>
-    </div>
-
-
-    <div class="size-style">
-      <label>Размер страницы:</label>
-      <select v-model="selectedSize" @change="changePageSize">
-        <option value="800x600">По умолчанию</option>
-        <option value="a4-portret">A4 (Портрет)</option>
-        <option value="a4-albom">A4 (Альбом)</option>
-        <option value="a5">A5</option>
-        <option value="Letter">Письмо</option>
-        <option value="custom">Свои размеры</option>
-      </select>
-      <div v-if="selectedSize === 'custom'">
-        <input type="number" v-model="customWidth" placeholder="Ширина" />
-        <input type="number" v-model="customHeight" placeholder="Высота" />
-        <button @click="applyCustomSize">Применить</button>
+        <div class="background-settings">
+          <label>Цвет фона:</label>
+          <input type="color" v-model="backgroundColor" @input="updateBackgroundColor" />
         </div>
       </div>
-    
-  <ExportControl
-    @export="handleExport"
-    @import="triggerXmlInput"
-  />
-
-  <button @click="newProject">
-    Новый проект
-  </button>
-
-  <div class="background-settings">
-    <label>Цвет фона:</label>
-
-    <input
-      type="color"
-      v-model="backgroundColor"
-      @input="updateBackgroundColor"
-    />
-  </div>
-  </div>
-
-  <div class="size-style">
-    <label>Размер страницы:</label>
-
-    <select
-      v-model="selectedSize"
-      @change="changePageSize"
-    >
-      <option value="800x600">По умолчанию</option>
-      <option value="a4-portret">A4 (Портрет)</option>
-      <option value="a4-albom">A4 (Альбом)</option>
-      <option value="a5">A5</option>
-      <option value="Letter">Письмо</option>
-      <option value="custom">Свои размеры</option>
-    </select>
-
-    <div v-if="selectedSize === 'custom'">
-      <input type="number" v-model="customWidth" placeholder="Ширина" />
-      <input type="number" v-model="customHeight" placeholder="Высота" />
-      <button @click="applyCustomSize">Применить</button>
     </div>
-  </div>
 
-</div>
     <TextDialog
       :show="showTextWindow"
       v-model:text="newTextValue"
@@ -308,28 +270,46 @@ function handleKeyDown(event: KeyboardEvent) {
 function addTextBlock() {
   if (!canvas.value) return
 
+  const canvasWidth = canvas.value.getWidth()
+  const canvasHeight = canvas.value.getHeight()
+
   const textbox = new fabric.Textbox('Введите текст', {
-    left: 100,
-    top: 100,
+    left: 0,
+    top: 0,
     width: 300,
     fontSize: 24,
     editable: true
   })
 
   canvas.value.add(textbox)
+  
+  const objWidth = textbox.width || 300
+  const objHeight = textbox.height || 24
+  textbox.set({
+    left: (canvasWidth - objWidth) / 2,
+    top: (canvasHeight - objHeight) / 2
+  })
   canvas.value.setActiveObject(textbox)
-
+  canvas.value.renderAll()
   textbox.enterEditing()
   textbox.selectAll()
 }
-
 function confirmAddText() {
   if (!canvas.value) return
+  const canvasWidth = canvas.value.getWidth()
+  const canvasHeight = canvas.value.getHeight()
   const finalText = newTextValue.value.trim() || 'Новый текст'
   const text = new fabric.Textbox(finalText, {
-    left: 50, top: 50, fontSize: 24, fontFamily: 'Arial', fill: '#000000',
-    hasControls: true, hasBorders: true, cornerSize: 8,
-    transparentCorners: false, cornerColor: '#3498db', borderColor: '#3498db',
+    left: 0, top: 0,
+    fontSize: 24,
+    fontFamily: 'Arial',
+    fill: '#000000',
+    hasControls: true,
+    hasBorders: true,
+    cornerSize: 8,
+    transparentCorners: false,
+    cornerColor: '#3498db',
+    borderColor: '#3498db',
     lockScalingX: false,
     lockScalingY: false
   })
@@ -338,6 +318,13 @@ function confirmAddText() {
     ml: true, mr: true, mt: true, mb: true
   })
   canvas.value.add(text)
+  const objWidth = text.width || 300
+  const objHeight = text.height || 24
+  text.set({
+    left: (canvasWidth - objWidth) / 2,
+    top: (canvasHeight - objHeight) / 2
+  })
+
   canvas.value.renderAll()
   canvas.value.setActiveObject(text)
   showTextWindow.value = false
@@ -511,73 +498,264 @@ onMounted(() => {
   window.addEventListener('keydown', handleKeyDown);
 });
 </script>
-
 <style scoped>
-.canvas-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+* {
+  box-sizing: border-box;
 }
+
 .canvas-editor {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 20px;
   min-height: 100vh;
-  padding: 10px;
-
+  padding: 20px;
   background: #f5f5f5;
-  transition: background 0.3s ease;
-}
-.editor-layout{
-  display:flex;
-  gap:20px;
-  align-items:flex-start;
+  color: #000;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
+/* Шапка */
+.header {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 28px;
+  color: inherit;
+}
+
+.header p {
+  margin: 5px 0 0;
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* Основной layout: левая панель — холст — правая панель */
+.editor-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* Левая панель (свойства выбранного объекта) */
+.left-panel {
+  width: 280px;
+  flex-shrink: 0;
+  padding: 15px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+/* Центральная область с холстом */
+.canvas-container {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #e0e0e0;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+#fabric-canvas {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-radius: 4px;
+  background: white;
+}
+
+/* Правая панель (инструменты и настройки) */
 .side-panel {
-  width: 260px;
+  width: 280px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 20px;
   padding: 15px;
-  border: 1px solid #444;
-  border-radius: 8px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+/* Общие стили для элементов форм */
+.side-panel label,
+.left-panel label {
+  font-weight: 500;
+  margin-top: 10px;
+  margin-bottom: 4px;
+  display: block;
+  font-size: 14px;
+}
+
+.side-panel select,
+.side-panel input,
+.side-panel button,
+.left-panel select,
+.left-panel input,
+.left-panel button,
+.left-panel textarea {
+  width: 100%;
+  padding: 8px 10px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  transition: all 0.2s;
 }
 
 .side-panel button,
-.side-panel select,
-.side-panel input,
-.side-panel textarea {
+.left-panel button {
+  background: #3498db;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.side-panel button:hover,
+.left-panel button:hover {
+  background: #2980b9;
+}
+
+.side-panel textarea,
+.left-panel textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Специфичные блоки */
+.theme-switch select,
+.size-style select,
+.background-settings input {
   width: 100%;
-  box-sizing: border-box;
 }
-.canvas-editor {
-  color: #000;
+
+.size-style {
+  display: flex;
+  flex-direction: column;
 }
-.canvas-editor label,
-.canvas-editor h1,
-.canvas-editor h2,
-.canvas-editor h3,
-.canvas-editor p {
-  color: inherit;
+
+.background-settings {
+  display: flex;
+  flex-direction: column;
 }
-.canvas-container{
-  flex:1;
+
+.text-style-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
 }
+
+.text-style-buttons button {
+  width: auto;
+  flex: 1 0 auto;
+  background: #ecf0f1;
+  color: #2c3e50;
+  border: 1px solid #bdc3c7;
+}
+
+.text-style-buttons button:hover {
+  background: #d5dbdb;
+}
+
+.text-style-buttons input[type="color"] {
+  width: 50px;
+  height: 38px;
+  padding: 2px;
+}
+
+.text-style-buttons select {
+  width: auto;
+  flex: 2;
+}
+
+/* Панель свойств */
+.properties-panel h3 {
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  border-bottom: 2px solid #3498db;
+  display: inline-block;
+  padding-bottom: 4px;
+}
+
+/* Кнопка нового проекта */
+.side-panel button:last-of-type {
+  background: #2ecc71;
+}
+
+.side-panel button:last-of-type:hover {
+  background: #27ae60;
+}
+
+/* Тёмная тема */
 .canvas-editor.dark {
+  background: #121212;
+  color: #eee;
+}
+
+.canvas-editor.dark .left-panel,
+.canvas-editor.dark .side-panel {
   background: #1e1e1e;
+  border-color: #444;
+  color: #eee;
+}
+
+.canvas-editor.dark select,
+.canvas-editor.dark input,
+.canvas-editor.dark textarea {
+  background: #2c2c2c;
+  border-color: #555;
+  color: #eee;
+}
+
+.canvas-editor.dark button {
+  background: #3a6ea5;
   color: white;
 }
-.toolbar {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
+
+.canvas-editor.dark button:hover {
+  background: #2c5282;
 }
-.group1, .export, .group3 {
-  display: flex;
-  gap: 16px;
+
+.canvas-editor.dark .text-style-buttons button {
+  background: #2c3e50;
+  color: #ecf0f1;
+  border-color: #1a2632;
 }
-.size-style, .templates {
-  margin-top: 10px;
+
+.canvas-editor.dark .text-style-buttons button:hover {
+  background: #1e2b38;
+}
+
+.canvas-editor.dark .properties-panel h3 {
+  border-bottom-color: #3a6ea5;
+}
+
+/* Адаптивность для узких экранов */
+@media (max-width: 900px) {
+  .editor-layout {
+    flex-direction: column;
+  }
+  
+  .left-panel,
+  .side-panel {
+    width: 100%;
+  }
+  
+  .canvas-container {
+    width: 100%;
+    overflow-x: auto;
+  }
 }
 </style>
