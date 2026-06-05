@@ -1,0 +1,209 @@
+.canvas-editor {
+  min-height: 100vh;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: #f4f6f9;
+  color: #222;
+  font-family: Inter, Arial, sans-serif;
+  transition: all 0.3s ease;
+}
+
+.canvas-editor.dark {
+  background: #16181d;
+  color: #ffffff;
+}
+
+.header {
+  padding: 20px 30px;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.canvas-editor.dark .header {
+  background: #22252c;
+}
+.header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+.header p {
+  margin-top: 6px;
+  color: #666;
+}
+.canvas-editor.dark .header p {
+  color: #b7b7b7;
+}
+
+.editor-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+.canvas-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background: white;
+  border-radius: 14px;
+  padding: 25px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+.canvas-editor.dark .canvas-container {
+  background: #22252c;
+}
+#fabric-canvas {
+  border: 1px solid #ddd;
+}
+.canvas-editor.dark #fabric-canvas {
+  border-color: #444;
+}
+
+.side-panel {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: white;
+  padding: 20px;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+.canvas-editor.dark .side-panel {
+  background: #22252c;
+}
+
+/* Явное наследование цвета для всех текстовых элементов внутри side-panel в тёмной теме */
+.canvas-editor.dark .side-panel,
+.canvas-editor.dark .side-panel label,
+.canvas-editor.dark .side-panel h3,
+.canvas-editor.dark .side-panel div,
+.canvas-editor.dark .side-panel span,
+.canvas-editor.dark .side-panel .theme-switch,
+.canvas-editor.dark .side-panel .size-style,
+.canvas-editor.dark .side-panel .background-settings,
+.canvas-editor.dark .side-panel .properties-panel {
+  color: #ffffff;
+}
+
+/* Поля ввода и select – тёмный фон, белый текст */
+.canvas-editor.dark .side-panel select,
+.canvas-editor.dark .side-panel input,
+.canvas-editor.dark .side-panel textarea {
+  background: #2b3038;
+  border-color: #3c414a;
+  color: white;
+}
+
+/* Кнопки внутри side-panel – синий фон, белый текст */
+.canvas-editor.dark .side-panel button {
+  background: #4b7cff;
+  color: white;
+}
+.canvas-editor.dark .side-panel button:hover {
+  background: #3f6ceb;
+}
+
+/* Остальные стили без изменений... */
+.side-panel label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.side-panel select,
+.side-panel input,
+.side-panel textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  box-sizing: border-box;
+  font-size: 14px;
+  transition: 0.2s;
+}
+.side-panel textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.side-panel select:focus,
+.side-panel input:focus,
+.side-panel textarea:focus {
+  outline: none;
+  border-color: #4b7cff;
+}
+.side-panel button {
+  width: 100%;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  background: #4b7cff;
+  color: white;
+  transition: 0.2s;
+}
+.side-panel button:hover {
+  transform: translateY(-1px);
+  background: #3f6ceb;
+}
+.text-style-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bottom-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  background: white;
+  padding: 20px;
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+.canvas-editor.dark .bottom-panel {
+  background: #22252c;
+}
+.size-style {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.properties-panel {
+  border-top: 1px solid #ddd;
+  padding-top: 15px;
+}
+.canvas-editor.dark .properties-panel {
+  border-color: #3b3b3b;
+}
+input[type=color] {
+  height: 45px;
+  padding: 4px;
+}
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #c4c4c4;
+  border-radius: 20px;
+}
+.canvas-editor.dark ::-webkit-scrollbar-thumb {
+  background: #555;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.properties-panel {
+  animation: fadeIn 0.2s ease;
+}

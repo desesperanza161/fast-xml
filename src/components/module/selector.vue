@@ -66,21 +66,3 @@ onMounted(() => {
 })
 </script>
 
-<style scoped>
-.template-selector {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.save-template-btn {
-  background: #27ae60;
-  color: white;
-  border: none;
-  padding: 4px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.save-template-btn:hover {
-  background: #2ecc71;
-}
-</style>

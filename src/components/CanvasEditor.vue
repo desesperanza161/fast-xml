@@ -1,8 +1,5 @@
 <template>
-  <div
-    class="canvas-editor"
-    :class="{ dark: editorTheme === 'dark' }"
-  >
+  <div class="canvas-editor" :class="{ dark: editorTheme === 'dark' }">
     <div class="header">
       <h1>Быстрые отчеты</h1>
       <p>Наш отчет — ваше время</p>
@@ -69,6 +66,22 @@
           </select>
         </div>
 
+        <div class="templates-section">
+          <label>Шаблоны</label>
+          <select v-model="selectedTemplateId" @change="(e: Event) => loadTemplateById((e.target as HTMLSelectElement).value)">
+            <option value="">-- Выберите шаблон --</option>
+            <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">
+              {{ tpl.name }}
+            </option>
+          </select>
+          <div class="template-buttons">
+            <button @click="saveCurrentAsTemplate">Сохранить как шаблон</button>
+            <button v-if="userTemplateId" @click="loadUserTemplate" class="user-template-btn">
+              Мой шаблон
+            </button>
+          </div>
+        </div>
+
         <div class="size-style">
           <label>Размер страницы:</label>
           <select v-model="selectedSize" @change="changePageSize">
@@ -117,9 +130,11 @@ import {
   exportToPNG,
   exportToJPEG,
   exportToSVG,
-  exportToPDF,
-  exportToXML
+  exportToPDF
 } from './module/export'
+
+const API_BASE = 'http://localhost:5000/api'
+
 const canvas = ref<fabric.Canvas | null>(null)
 const selectedSize = ref('800x600')
 const customWidth = ref(800)
@@ -140,29 +155,144 @@ const isBold = ref(false)
 const isItalic = ref(false)
 const isUnderline = ref(false)
 
-function handleExport(format: string) {
+const templates = ref<Array<{ id: string; name: string }>>([])
+const selectedTemplateId = ref('')
+const userTemplateId = ref<string | null>(null)
 
-  switch (format) {
-    case 'png':
-      exportToPNG(canvas.value)
-      break
+async function getProjectXML(): Promise<string> {
+  if (!canvas.value) throw new Error('Canvas не инициализирован')
+  const canvasJSON = canvas.value.toJSON()
+  const project = {
+    canvas: canvasJSON,
+    page: {
+      width: canvas.value.getWidth(),
+      height: canvas.value.getHeight(),
+      backgroundColor: backgroundColor.value
+    },
+    ui: { editorTheme: editorTheme.value }
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <data><![CDATA[${JSON.stringify(project)}]]></data>
+</project>`
+}
 
-    case 'jpeg':
-      exportToJPEG(canvas.value)
-      break
-
-    case 'svg':
-      exportToSVG(canvas.value)
-      break
-
-    case 'pdf':
-      exportToPDF(canvas.value)
-      break
-
-    case 'xml':
-      exportToXML(canvas.value, {
-        editorTheme: editorTheme.value
+async function importFromXML(xmlString: string) {
+  if (!canvas.value) return
+  try {
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(xmlString, 'application/xml')
+    const cdata = xmlDoc.querySelector('data')?.textContent
+    if (!cdata) throw new Error('Не найден CDATA с данными')
+    const project = JSON.parse(cdata)
+    await new Promise<void>((resolve) => {
+      canvas.value?.loadFromJSON(project.canvas, () => {
+        if (project.page) {
+          canvas.value?.setDimensions({ width: project.page.width, height: project.page.height })
+          canvas.value?.set('backgroundColor', project.page.backgroundColor)
+          backgroundColor.value = project.page.backgroundColor
+          selectedSize.value = 'custom'
+          customWidth.value = project.page.width
+          customHeight.value = project.page.height
+        }
+        if (project.ui) editorTheme.value = project.ui.editorTheme || 'light'
+        canvas.value?.renderAll()
+        resolve()
       })
+    })
+  } catch (err) {
+    console.error('Ошибка импорта XML', err)
+    throw err
+  }
+}
+
+async function fetchTemplatesFromServer() {
+  try {
+    const res = await fetch(`${API_BASE}/templates`)
+    if (!res.ok) throw new Error('Ошибка загрузки шаблонов')
+    const data = await res.json()
+    templates.value = data
+    userTemplateId.value = templates.value.length > 0 ? templates.value[0].id : null
+  } catch (err) {
+    console.error(err)
+    alert('Не удалось загрузить шаблоны с сервера')
+  }
+}
+
+async function saveTemplateToServer(xmlData: string, name: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/templates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ xmlData, name })
+  })
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(err.error || 'Ошибка сохранения')
+  }
+  const newTemplate = await res.json()
+  return newTemplate.id
+}
+
+async function loadTemplateFromServer(id: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/templates/${id}`)
+  if (!res.ok) throw new Error('Шаблон не найден')
+  return await res.text()
+}
+
+
+async function saveCurrentAsTemplate() {
+  if (!canvas.value) return
+  const name = prompt('Введите название шаблона:', 'Мой шаблон')
+  if (!name) return
+  try {
+    const xmlString = await getProjectXML()
+    const newId = await saveTemplateToServer(xmlString, name)
+    templates.value.push({ id: newId, name })
+    selectedTemplateId.value = newId
+    userTemplateId.value = newId
+    alert('Шаблон сохранён на сервере')
+  } catch (err: any) {
+    alert('Ошибка сохранения: ' + err.message)
+  }
+}
+
+
+async function loadTemplateById(templateId: string) {
+  if (!canvas.value || !templateId) return
+  try {
+    const xmlString = await loadTemplateFromServer(templateId)
+    await importFromXML(xmlString)
+  } catch (err: any) {
+    console.error(err)
+    alert('Ошибка загрузки шаблона: ' + err.message)
+  }
+}
+
+async function loadUserTemplate() {
+  if (userTemplateId.value) {
+    await loadTemplateById(userTemplateId.value)
+  } else {
+    alert('Нет сохранённого шаблона. Сначала сохраните текущий проект как шаблон.')
+  }
+}
+
+
+function handleExport(format: string) {
+  switch (format) {
+    case 'png': exportToPNG(canvas.value); break
+    case 'jpeg': exportToJPEG(canvas.value); break
+    case 'svg': exportToSVG(canvas.value); break
+    case 'pdf': exportToPDF(canvas.value); break
+    case 'xml':
+      getProjectXML().then(xmlString => {
+        const blob = new Blob([xmlString], { type: 'application/xml' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        link.href = url
+        link.download = 'project.xml'
+        link.click()
+        URL.revokeObjectURL(url)
+      }).catch(err => console.error(err))
       break
   }
 }
@@ -175,90 +305,100 @@ function loadObjectProperties() {
     selectedFontSize.value = selectedObject.value.fontSize || 24
     selectedColor.value = selectedObject.value.fill || '#000000'
     selectedTextAlign.value = selectedObject.value.textAlign || 'left'
-    isBold.value = selectedObject.value.fontWeight || 'bold'
-    isItalic.value = selectedObject.value.fontStyle || 'italic'
-    isUnderline.value = selectedObject.value.underline || true
+    isBold.value = selectedObject.value.fontWeight === 'bold'
+    isItalic.value = selectedObject.value.fontStyle === 'italic'
+    isUnderline.value = !!selectedObject.value.underline
   } else if (selectedObject.value.type === 'image') {
     selectedOpacity.value = selectedObject.value.opacity || 1
-  } 
+  }
 }
-function updateBackgroundColor() {
-  if (!canvas.value) return
 
+function updateBackgroundColor(event?: Event) {
+  if (!canvas.value) return
   canvas.value.set('backgroundColor', backgroundColor.value)
   canvas.value.renderAll()
 }
 
-function updateText() {
+function updateText(event?: Event) {
   if (selectedObject.value?.type === 'textbox') {
     selectedObject.value.set('text', editableText.value)
     canvas.value?.renderAll()
   }
 }
-function updateFont() {
+
+function updateFont(event?: Event) {
   if (selectedObject.value?.type === 'textbox') {
     selectedObject.value.set('fontFamily', selectedFont.value)
     canvas.value?.renderAll()
   }
 }
-function updateFontSize() {
+
+function updateFontSize(event?: Event) {
   if (selectedObject.value?.type === 'textbox') {
-    selectedObject.value.set('fontSize', selectedFontSize.value);
-    canvas.value?.renderAll();
+    selectedObject.value.set('fontSize', selectedFontSize.value)
+    canvas.value?.renderAll()
   }
 }
-function updateColor() {
+
+function updateColor(event?: Event) {
   if (selectedObject.value?.type === 'textbox') {
     selectedObject.value.set('fill', selectedColor.value)
     canvas.value?.renderAll()
   }
 }
-function updateTextAlign() {
+
+function updateTextAlign(event?: Event) {
   if (selectedObject.value?.type === 'textbox') {
     selectedObject.value.set('textAlign', selectedTextAlign.value)
     canvas.value?.renderAll()
   }
 }
-function toggleBold() {
-  if (selectedObject.value?.type !== 'textbox') return
 
+function toggleBold(event?: Event) {
+  if (selectedObject.value?.type !== 'textbox') return
   isBold.value = !isBold.value
-
-  selectedObject.value.set({
-    fontWeight: isBold.value ? 'bold' : 'normal'
-  })
-
+  selectedObject.value.set('fontWeight', isBold.value ? 'bold' : 'normal')
   canvas.value?.renderAll()
 }
 
-function toggleItalic() {
+function toggleItalic(event?: Event) {
   if (selectedObject.value?.type !== 'textbox') return
-
   isItalic.value = !isItalic.value
-
-  selectedObject.value.set({
-    fontStyle: isItalic.value ? 'italic' : 'normal'
-  })
-
+  selectedObject.value.set('fontStyle', isItalic.value ? 'italic' : 'normal')
   canvas.value?.renderAll()
 }
 
-function toggleUnderline() {
+function toggleUnderline(event?: Event) {
   if (selectedObject.value?.type !== 'textbox') return
-
   isUnderline.value = !isUnderline.value
-
-  selectedObject.value.set({
-    underline: isUnderline.value
-  })
-
+  selectedObject.value.set('underline', isUnderline.value)
   canvas.value?.renderAll()
 }
-function updateOpacity() {
+
+function updateOpacity(event?: Event) {
   if (selectedObject.value?.type === 'image') {
     selectedObject.value.set('opacity', selectedOpacity.value)
     canvas.value?.renderAll()
   }
+}
+
+function changePageSize(event?: Event) {
+  if (!canvas.value) return
+  let width = 800, height = 600
+  switch (selectedSize.value) {
+    case 'a4-portret': width = 595; height = 842; break
+    case 'a4-albom': width = 842; height = 595; break
+    case 'a5': width = 420; height = 595; break
+    case 'Letter': width = 612; height = 792; break
+    case 'custom': width = customWidth.value; height = customHeight.value; break
+    default: width = 800; height = 600
+  }
+  canvas.value.setDimensions({ width, height })
+  canvas.value.renderAll()
+}
+
+function applyCustomSize(event?: Event) {
+  if (selectedSize.value === 'custom') changePageSize()
 }
 
 function handleKeyDown(event: KeyboardEvent) {
@@ -267,22 +407,16 @@ function handleKeyDown(event: KeyboardEvent) {
     event.preventDefault()
   }
 }
+
+
 function addTextBlock() {
   if (!canvas.value) return
-
   const canvasWidth = canvas.value.getWidth()
   const canvasHeight = canvas.value.getHeight()
-
   const textbox = new fabric.Textbox('Введите текст', {
-    left: 0,
-    top: 0,
-    width: 300,
-    fontSize: 24,
-    editable: true
+    left: 0, top: 0, width: 300, fontSize: 24, editable: true
   })
-
   canvas.value.add(textbox)
-  
   const objWidth = textbox.width || 300
   const objHeight = textbox.height || 24
   textbox.set({
@@ -294,24 +428,17 @@ function addTextBlock() {
   textbox.enterEditing()
   textbox.selectAll()
 }
+
 function confirmAddText() {
   if (!canvas.value) return
   const canvasWidth = canvas.value.getWidth()
   const canvasHeight = canvas.value.getHeight()
   const finalText = newTextValue.value.trim() || 'Новый текст'
   const text = new fabric.Textbox(finalText, {
-    left: 0, top: 0,
-    fontSize: 24,
-    fontFamily: 'Arial',
-    fill: '#000000',
-    hasControls: true,
-    hasBorders: true,
-    cornerSize: 8,
-    transparentCorners: false,
-    cornerColor: '#3498db',
-    borderColor: '#3498db',
-    lockScalingX: false,
-    lockScalingY: false
+    left: 0, top: 0, fontSize: 24, fontFamily: 'Arial', fill: '#000000',
+    hasControls: true, hasBorders: true, cornerSize: 8,
+    transparentCorners: false, cornerColor: '#3498db', borderColor: '#3498db',
+    lockScalingX: false, lockScalingY: false
   })
   ;(text as any).setControlsVisibility({
     tl: true, tr: true, bl: true, br: true,
@@ -324,7 +451,6 @@ function confirmAddText() {
     left: (canvasWidth - objWidth) / 2,
     top: (canvasHeight - objHeight) / 2
   })
-
   canvas.value.renderAll()
   canvas.value.setActiveObject(text)
   showTextWindow.value = false
@@ -366,139 +492,61 @@ function triggerXmlInput() {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '.xml'
-
   input.onchange = (e: Event) => {
     const file = (e.target as HTMLInputElement).files?.[0]
-
     if (!file || !canvas.value) return
-
     const reader = new FileReader()
-
-    reader.onload = (f) => {
+    reader.onload = async (f) => {
       try {
         const xmlString = f.target?.result as string
-
-        const parser = new DOMParser()
-        const xmlDoc = parser.parseFromString(
-          xmlString,
-          'application/xml'
-        )
-
-        const cdata =
-          xmlDoc.querySelector('data')?.textContent
-
-        if (!cdata) return
-
-        const project = JSON.parse(cdata)
-
-        canvas.value?.loadFromJSON(
-          project.canvas,
-          () => {
-
-            if (project.page) {
-
-              canvas.value?.setDimensions({
-                width: project.page.width,
-                height: project.page.height
-              })
-
-              canvas.value?.set(
-                'backgroundColor',
-                project.page.backgroundColor
-              )
-
-              backgroundColor.value =
-                project.page.backgroundColor
-
-              selectedSize.value = 'custom'
-
-              customWidth.value =
-                project.page.width
-
-              customHeight.value =
-                project.page.height
-            }
-
-            if (project.ui) {
-
-              editorTheme.value =
-                project.ui.editorTheme || 'light'
-            }
-
-            canvas.value?.renderAll()
-          }
-        )
-
+        await importFromXML(xmlString)
+        alert('Проект загружен')
       } catch (err) {
-        console.error(
-          'Ошибка загрузки XML',
-          err
-        )
+        console.error('Ошибка загрузки XML', err)
+        alert('Ошибка загрузки XML')
       }
     }
-
     reader.readAsText(file)
   }
-
   input.click()
-}
-
-function changePageSize() {
-  if (!canvas.value) return
-  let width = 800, height = 600
-  switch (selectedSize.value) {
-    case 'a4-portret': width = 595; height = 842; break
-    case 'a4-albom': width = 842; height = 595; break
-    case 'a5': width = 420; height = 595; break
-    case 'Letter': width = 612; height = 792; break
-    case 'custom': width = customWidth.value; height = customHeight.value; break
-    default: width = 800; height = 600
-  }
-  canvas.value.setDimensions({ width, height })
-  canvas.value.renderAll()
-}
-
-function applyCustomSize() {
-  if (selectedSize.value === 'custom') changePageSize()
 }
 
 function newProject() {
   if (!canvas.value) return
   canvas.value.clear()
-  canvas.value.backgroundColor = 'white'
+  canvas.value.set('backgroundColor', '#ffffff')
   selectedSize.value = '800x600'
   changePageSize()
   canvas.value.renderAll()
+  backgroundColor.value = '#ffffff'
+  editorTheme.value = 'light'
 }
-
-function loadTemplate(templateId: string) {
-  console.log('Загружаем шаблон:', templateId)
-}
-
 
 onMounted(() => {
   const fabricCanvas = new fabric.Canvas('fabric-canvas', {
     width: 800, height: 600, backgroundColor: 'white'
-  });
-  canvas.value = fabricCanvas;
-  changePageSize();
+  })
+  canvas.value = fabricCanvas
+  changePageSize()
+  fetchTemplatesFromServer()
 
   fabricCanvas.on('selection:created', (e) => {
-    selectedObject.value = e.selected[0];
-    loadObjectProperties();
-  });
+    selectedObject.value = e.selected[0]
+    loadObjectProperties()
+  })
   fabricCanvas.on('selection:updated', (e) => {
-    selectedObject.value = e.selected[0];
-    loadObjectProperties();
-  });
+    selectedObject.value = e.selected[0]
+    loadObjectProperties()
+  })
   fabricCanvas.on('selection:cleared', () => {
-    selectedObject.value = null;
-  });
+    selectedObject.value = null
+  })
 
-  window.addEventListener('keydown', handleKeyDown);
-});
+  window.addEventListener('keydown', handleKeyDown)
+})
 </script>
-<style scoped>
+
+<style>
 * {
   box-sizing: border-box;
 }
@@ -514,7 +562,6 @@ onMounted(() => {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* Шапка */
 .header {
   text-align: center;
   margin-bottom: 10px;
@@ -532,14 +579,12 @@ onMounted(() => {
   opacity: 0.8;
 }
 
-/* Основной layout: левая панель — холст — правая панель */
 .editor-layout {
   display: flex;
   gap: 20px;
   align-items: flex-start;
 }
 
-/* Левая панель (свойства выбранного объекта) */
 .left-panel {
   width: 280px;
   flex-shrink: 0;
@@ -551,7 +596,6 @@ onMounted(() => {
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-/* Центральная область с холстом */
 .canvas-container {
   flex: 1;
   min-width: 0;
@@ -569,7 +613,6 @@ onMounted(() => {
   background: white;
 }
 
-/* Правая панель (инструменты и настройки) */
 .side-panel {
   width: 280px;
   flex-shrink: 0;
@@ -584,7 +627,6 @@ onMounted(() => {
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-/* Общие стили для элементов форм */
 .side-panel label,
 .left-panel label {
   font-weight: 500;
@@ -621,6 +663,39 @@ onMounted(() => {
   font-weight: bold;
 }
 
+.templates-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.template-buttons button {
+  flex: 1;
+  background: #9b59b6;
+}
+
+.template-buttons button.user-template-btn {
+  background: #e67e22;
+}
+
+.template-buttons button:hover {
+  filter: brightness(0.9);
+}
+
+.canvas-editor.dark .template-buttons button {
+  background: #8e44ad;
+}
+
+.canvas-editor.dark .template-buttons button.user-template-btn {
+  background: #d35400;
+}
+
 .side-panel button:hover,
 .left-panel button:hover {
   background: #2980b9;
@@ -632,7 +707,6 @@ onMounted(() => {
   min-height: 80px;
 }
 
-/* Специфичные блоки */
 .theme-switch select,
 .size-style select,
 .background-settings input {
@@ -680,7 +754,6 @@ onMounted(() => {
   flex: 2;
 }
 
-/* Панель свойств */
 .properties-panel h3 {
   margin: 0 0 15px 0;
   font-size: 18px;
@@ -689,7 +762,6 @@ onMounted(() => {
   padding-bottom: 4px;
 }
 
-/* Кнопка нового проекта */
 .side-panel button:last-of-type {
   background: #2ecc71;
 }
@@ -698,7 +770,6 @@ onMounted(() => {
   background: #27ae60;
 }
 
-/* Тёмная тема */
 .canvas-editor.dark {
   background: #121212;
   color: #eee;
@@ -742,7 +813,6 @@ onMounted(() => {
   border-bottom-color: #3a6ea5;
 }
 
-/* Адаптивность для узких экранов */
 @media (max-width: 900px) {
   .editor-layout {
     flex-direction: column;

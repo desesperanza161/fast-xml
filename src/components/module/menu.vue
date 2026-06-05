@@ -13,14 +13,3 @@
 
     <script setup land="ts"></script>
 
-    <style scoped>
-.toolbar{
-    display: flex;
-    gap: 20px;
-    flew-wrap: wrap
-}
-.group, .export, .project{
-    display: flex;
-    gap: 16px;
-}
-</style>
