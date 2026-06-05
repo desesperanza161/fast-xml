@@ -453,6 +453,7 @@ function confirmAddText() {
   })
   canvas.value.renderAll()
   canvas.value.setActiveObject(text)
+  selectedObject.value.setCoords()
   showTextWindow.value = false
 }
 
