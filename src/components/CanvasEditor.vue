@@ -599,6 +599,7 @@ onMounted(() => {
 .canvas-container {
   flex: 1;
   min-width: 0;
+  overflow: auto;          
   display: flex;
   justify-content: center;
   align-items: center;
@@ -823,9 +824,19 @@ onMounted(() => {
     width: 100%;
   }
   
-  .canvas-container {
-    width: 100%;
-    overflow-x: auto;
-  }
+.canvas-container {
+  flex: 1;
+  min-width: 0;
+  background: white;
+  border-radius: 0; 
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
+#fabric-canvas {
+  box-shadow: none; 
+  background: white;
+}}
 </style>
